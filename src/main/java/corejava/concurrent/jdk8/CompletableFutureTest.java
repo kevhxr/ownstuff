@@ -2,89 +2,103 @@ package corejava.concurrent.jdk8;
 
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class CompletableFutureTest {
+
+    static List<Shop> shops = Arrays.asList(new Shop("shop1"),
+            new Shop("shop2"),
+            new Shop("shop3"),
+            new Shop("shop4"),
+            new Shop("shop5"),
+            new Shop("shop6"),
+            new Shop("shop7"),
+            new Shop("shop8"),
+            new Shop("shop9"),
+            new Shop("shop11"));
+
+    public static void mimicException(ThreadLocalRandom random) {
+        boolean bool = random.nextBoolean();
+        if (bool) {
+            int b = 1 / 0;
+        }
+    }
+
     public static void main(String[] args) {
-        CompletableFuture<String> completableFutureOne = new CompletableFuture<>();
-
-        // futureA.join();
-        ExecutorService cachePool = Executors.newCachedThreadPool();
-        /**
-         * runAsync方法不支持返回值。
-         * supplyAsync可以支持返回值。
-         */
-        CompletableFuture<String> futureA = CompletableFuture.
-                supplyAsync(() -> {
-                    System.out.println("supplyAsync: " + Thread.currentThread().getName());
-                    return "执行结果:" + (100 / 10);
-                }, cachePool)
-                .thenApply(s -> {
-                    System.out.println("thenApplyAsync: " + Thread.currentThread().getName());
-                    return "apply result:" + s;
-                })
-                .exceptionally(e -> {
-                    System.out.println("执行失败！" + e.getMessage());
-                    return null;
-                })
+        ExecutorService threadPool = Executors.newFixedThreadPool(10);
+        List<CompletableFuture<String>> collect = shops.stream().parallel().map(
                 /**
-                 * whenComplete：是执行当前任务的线程执行继续执行 whenComplete 的任务。
-                 * whenCompleteAsync：是执行把 whenCompleteAsync 这个任务继续提交给线程池来进行执行。
+                 * runAsync方法不支持返回值。
+                 * supplyAsync可以支持返回值。
                  */
-                .whenComplete((s, e) -> {
-                    if (e == null) {
-                        System.out.println("no e:   " + s);//futureA result: 100
-                    } else {
-                        System.out.println("e is not empty: " + e.getMessage());//未执行
-                    }
-                });
-
-        List<Shop> shops = Arrays.asList(new Shop("shop1"),
-                new Shop("shop2"),
-                new Shop("shop3"),
-                new Shop("shop4"),
-                new Shop("shop5"),
-                new Shop("shop6"),
-                new Shop("shop7"),
-                new Shop("shop8"),
-                new Shop("shop9"));
-
-        List<CompletableFuture<String>> collect = shops.stream().parallel().map(shop -> CompletableFuture.
-                supplyAsync(() -> {
-                    System.out.println("supplyAsync: " + Thread.currentThread().getName());
+                shop -> CompletableFuture.supplyAsync(() -> {
                     ThreadLocalRandom random = ThreadLocalRandom.current();
-                    boolean b = random.nextBoolean();
-                    int a = 100;
-                    if (b) {
+                    int randInt = random.nextInt(0, 10);
+                    int a = 1000;
+                    if (randInt < 5) {
                         a = a / 0;
                     } else {
-                        a = a / 10;
+                        a = a / randInt;
                     }
-                    return "执行结果:" + a + Thread.currentThread().getName() + "-" + shop.getName();
-                }, cachePool)
-                .thenApply(s -> {
-                    //System.out.println("thenApplyAsync: " + Thread.currentThread().getName());
-                    return "apply result:" + s;
-                })
-                .exceptionally(e -> {
-                    System.out.println("执行失败！" + e.getMessage());
-                    return null;
-                })
-                .whenComplete((s, e) -> {
-                    if (e == null) {
-                        //System.out.println("no e:   " + s);//futureA result: 100
-                    } else {
-                        // System.out.println("e is not empty: " + e.getMessage());//未执行
-                    }
-                })).collect(Collectors.toList());
-        //collect.stream().map(CompletableFuture::join);
+                    return "Th:" + Thread.currentThread().getName() + "; result: " + shop.getName() + " (profit:" + a + ")";
+                }, threadPool)
+                        .thenApply(s -> {
+                            mimicException(ThreadLocalRandom.current());
+                            return "apply: " + s;
+                        })
+                        .exceptionally(e -> {
+                            System.out.println("failure: " + e.getMessage());
+                            return null;
+                        })
+                        .whenComplete((s, e) -> {
+                            if (e == null) {
+                                System.out.println("Complete success:   " + s);
+                            } else {
+                                System.out.println("Complete failure: " + e.getMessage());
+                            }
+                        }))
+                .collect(Collectors.toList());
+
+        List<String> finalList = collect.stream()
+                .map(CompletableFuture::join)
+                .filter(shop -> shop != null)
+                .collect(Collectors.toList());
+
         System.out.println();
         System.out.println();
-        //collect1.stream().forEach(a-> System.out.println(a));
-        cachePool.shutdown();
+        finalList.stream().forEach(a -> System.out.println(a));
+        threadPool.shutdown();
+    }
+
+    @Test
+    public void testWhenCompleteException() {
+        TreeMap<String, String> resMap = new TreeMap<>(Comparator.comparingInt(o -> Integer.parseInt(o.substring(4))));
+        resMap.put("shop0","sd");
+        ExecutorService threadPool = Executors.newFixedThreadPool(10);
+        shops.stream().parallel().forEach(
+                shop ->
+                        CompletableFuture.supplyAsync(() -> "Th:" + Thread.currentThread().getName() + " success!", threadPool)
+                                .thenApply(s -> {
+                                    mimicException(ThreadLocalRandom.current());
+                                    return "apply: " + s;
+                                })
+                                .exceptionally(e -> {
+                                    mimicException(ThreadLocalRandom.current());
+                                    return "exception handle correctly";
+                                })
+                                .whenComplete((s, e) -> {
+                                    if (e == null) {
+                                        resMap.put(shop.getName(), "Complete success: " + s);
+                                    } else {
+                                        resMap.put(shop.getName(), "Complete failure: && exception handle failed: " + e.getMessage());
+                                    }
+                                })
+        );
+        resMap.entrySet().forEach(s -> System.out.println("() -- " + s.getKey() + " --- " + s.getValue()));
+        threadPool.shutdown();
 
     }
 
