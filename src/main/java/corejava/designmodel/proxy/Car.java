@@ -15,4 +15,8 @@ public class Car implements Vehicle, Product {
     public void owner(User user) {
         System.out.println(user.getName()+"  "+user.getAge());
     }
+
+    protected void engineStart(){
+        System.out.println("start engine");
+    }
 }

@@ -76,7 +76,7 @@ public class CompletableFutureTest {
     @Test
     public void testWhenCompleteException() {
         TreeMap<String, String> resMap = new TreeMap<>(Comparator.comparingInt(o -> Integer.parseInt(o.substring(4))));
-        resMap.put("shop0","sd");
+        resMap.put("shop0", "sd");
         ExecutorService threadPool = Executors.newFixedThreadPool(10);
         shops.stream().parallel().forEach(
                 shop ->
@@ -151,5 +151,78 @@ public class CompletableFutureTest {
                         }
                 );
         System.out.println(completableFuture.get());
+    }
+
+    @Test
+    public void multipleFutureTest() throws Exception {
+
+        String out = "";
+        HashMap<String, Integer> teamMap = new HashMap<>();
+        teamMap.put("Timberwolf", 1);
+        teamMap.put("wizard", 2);
+        teamMap.put("Magic", 3);
+        List<CompletableFuture<String>> futures = new ArrayList<>();
+        teamMap.entrySet().iterator().forEachRemaining(map ->
+                futures.add(CompletableFuture.supplyAsync(() -> {
+                    try {
+                        Thread.sleep(100 * map.getValue());
+                        System.out.println(map.getKey() + map.getValue());
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    return map.getKey();
+                })));
+        CompletableFuture<Void> combinedF = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+        combinedF.get();
+        System.out.println("block done");
+/*
+        String combined = Stream.of(futures.toArray((new CompletableFuture[0])))
+                .map(CompletableFuture::join)
+                .collect(Collectors.joining(" "));
+        System.out.println(combined);*/
+    }
+
+
+    @Test
+    public void handleTest() throws ExecutionException, InterruptedException {
+
+        String name ;
+        Random random = new Random();
+        boolean b = random.nextBoolean();
+        System.out.println(b);
+        name = !b ? null : "sd";
+
+        CompletableFuture<String> completableFuture
+                = CompletableFuture.supplyAsync(() -> {
+            if (name == null) {
+                throw new RuntimeException("Computation error!");
+            }
+            return "Hello, " + name;
+        }).handle((result, ex) -> {
+            System.out.println(result);
+            if(ex != null && ex instanceof RuntimeException){
+                return result != null ? result : "Hello, runtime stranger!";
+            }
+            System.out.println(ex);
+            return result != null ? result : "Hello, Stranger!";
+        });
+
+        String s = completableFuture.get();
+        System.out.println(s);
+    }
+
+    @Test
+    public void doTestMultiPram() {
+        List<String> strList = new ArrayList<>();
+        strList.add("www");
+        strList.add("www2");
+        strList.add("www1");
+
+        testMultiPram(strList.toArray(new String[0]));
+    }
+
+    public static void testMultiPram(String... strArr) {
+        Arrays.stream(strArr).forEach(a -> System.out.println(a));
     }
 }

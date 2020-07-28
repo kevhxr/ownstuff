@@ -1,0 +1,46 @@
+syntax = "proto2";
+
+package com.xr.nettychat.protobuf;
+
+option optimize_for = SPEED;
+option java_package = "com.xr.nettychat.protobuf";
+option java_outer_classname =  "DataInfo";
+
+
+message XrMessage{
+
+    enum MessageType{
+        StudentType = 1;
+        AddressType = 2;
+        SchoolType = 3;
+    }
+    required MessageType message_type = 1;
+
+    oneof dataBody{
+        Student student = 2;
+        Address address = 3;
+        School school = 4;
+
+    }
+}
+
+
+
+message Student{
+      optional string name = 1;
+      optional int32 age = 2;
+      optional string address = 3;
+}
+
+message Address{
+      optional string addr_name = 1;
+      optional int32 addr_no = 2;
+}
+
+
+message School{
+      optional string name = 1;
+      optional string city = 2;
+}
+
+
